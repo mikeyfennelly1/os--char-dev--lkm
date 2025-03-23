@@ -10,6 +10,8 @@
 #include <linux/module.h>                   // functions for kernel module development
 #include <linux/seq_file.h>                 // sequential file functions
 #include <linux/kernel.h>                   // kernel development headerss
+#include <linux/fs.h>
+#include <linux/types.h>
 
 #include "sysinfo_dev.h"
 #include "job.h"
@@ -24,14 +26,12 @@ int my_proc_open(struct inode *inode, struct file *file);
 int __init char_device_proc_init(void);
 void __exit char_device_proc_exit(void);
 
-// structure to hold information about the proc file
-struct proc_dir_entry *proc_entry;
-
+static loff_t original_offset = 0;
 /**
  * @brief called when userspace file reads /proc/sysinfo
  * 
  * @param file - pointer to /proc file struct in kernel space
- * @param read_buffer - buffer which the function data will be copied
+ * @param user_buffer - buffer which the function data will be copied
  * @param available_bytes - number of bytes the reader is allowed to read
  * @param offset - offset for start of read within the file
  * 
@@ -39,7 +39,7 @@ struct proc_dir_entry *proc_entry;
  */
 ssize_t
 sysinfo_proc_read(struct file *file,
-                  char *read_buffer,
+                  const char *user_buffer,
                   size_t available_bytes,
                   loff_t *offset)
 {
@@ -47,9 +47,10 @@ sysinfo_proc_read(struct file *file,
     char buffer[PROCFS_MAX_SIZE];
 
     // check if read is finished, if so return EOF
-    if (*offset > 0)
+    if (offset > 0)
     {
-        return EOF;
+        printk("original offset is 0");
+        ret = 0;
     }
 
     // use snprintf to ensure write doesn't overflow buffer
@@ -66,16 +67,19 @@ sysinfo_proc_read(struct file *file,
         len = available_bytes;
     }
 
-    if (copy_to_user(read_buffer, read_buffer, len))
+    if (copy_to_user(buffer, user_buffer, len))
     {
         return -EFAULT;
     }
 
-    *offset += len;
+    offset += len;
 
     return len;
 };
 
+
+// structure to hold information about the proc file
+struct proc_dir_entry *proc_entry;
 
 static const struct proc_ops proc_ops = {
     .proc_read = sysinfo_proc_read,

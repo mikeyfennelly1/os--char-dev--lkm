@@ -155,13 +155,12 @@ void append_step_to_job(Job* job,
 
     while (cur->next != NULL)       // until cur.next is a NULL pointer
     {
-        printk("Walking job list. Current KVP key: %s\n", cur->get_kvp().key);
         cur = cur->next;            // ... walk the job.
     }
     
     if (get_kvp_func == NULL)
     {
-        printk("get_kvp_func == NULL\n");
+        pr_err("get_kvp_func == NULL\n");
         return;
     }
 
@@ -169,17 +168,16 @@ void append_step_to_job(Job* job,
     Step* p_step_to_add = step_init(get_kvp_func);
     if (p_step_to_add == NULL)
     {
-        printk(KERN_ERR "Pointer to step to add is NULL\n");
+        pr_err("Pointer to step to add is NULL\n");
         return;
     }
     cur->next = p_step_to_add;
 
     if (cur->next == NULL)
     {
-        printk("End of the list reached.\n");
-        printk("kvp_of cur (expected to be last) is: %s:%s.\n", cur->get_kvp().key, cur->get_kvp().value);
+        pr_err("End of the list reached.\n");
+        pr_err("kvp_of cur (expected to be last) is: %s:%s.\n", cur->get_kvp().key, cur->get_kvp().value);
     }
-
 
     job->step_count++;
     return;
