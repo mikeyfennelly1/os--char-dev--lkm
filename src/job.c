@@ -13,7 +13,7 @@
 #define MEMORY 2
 #define DISK 3
 
-static int current_info_type = 1;
+static int current_info_type = CPU;
 
 typedef struct {
     char *data;         // The buffer
@@ -228,8 +228,6 @@ run_job(Job* j)
     }
 
     append_to_job_buffer(target_buf, "}");
-    printk("run_job, target_buf->data: \n %s\n", target_buf->data);
-    printk("run_count: %d\n", run_count);
 
     return target_buf->data;
 }
@@ -242,6 +240,7 @@ run_job(Job* j)
 Job*
 get_current_job(void)
 {
+    printk(KERN_DEBUG "get_current_job called\n");
     Job* current_job;
     
     switch (current_info_type)
@@ -257,6 +256,7 @@ get_current_job(void)
             break;
         default:
             current_job = get_cpu_job();
+            break;
     }
     return current_job;
 }
