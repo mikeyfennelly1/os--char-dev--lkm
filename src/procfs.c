@@ -10,6 +10,8 @@
 #include <linux/module.h>                   // functions for kernel module development
 #include <linux/seq_file.h>                 // sequential file functions
 #include <linux/kernel.h>                   // kernel development headerss
+#include <linux/fs.h>                       // file system interaction headers
+#include <linux/types.h>                    // types for file offsets, sizes etc
 
 #include "sysinfo_dev.h"
 #include "job.h"
@@ -18,64 +20,80 @@
 #define EOF 0
 #define PROCFS_MAX_SIZE 256
 
-ssize_t sysinfo_proc_read(struct file *file, char *read_buffer, size_t whatever_size,  loff_t *offset);
+char* current_info_type;
+int device_read_count;
+
+ssize_t sysinfo_proc_read(struct file *file, char *user_buffer, size_t available_bytes,  loff_t *offset);
 int append_to_proc(struct seq_file *m, void *v);
 int my_proc_open(struct inode *inode, struct file *file);
 int __init char_device_proc_init(void);
 void __exit char_device_proc_exit(void);
 
-// structure to hold information about the proc file
-struct proc_dir_entry *proc_entry;
-
 /**
  * @brief called when userspace file reads /proc/sysinfo
  * 
  * @param file - pointer to /proc file struct in kernel space
- * @param read_buffer - buffer which the function data will be copied
+ * @param user_buffer - buffer which the function data will be copied
  * @param available_bytes - number of bytes the reader is allowed to read
- * @param offset - offset for start of read within the file
+ * @param offset - offset for start of read within the file.
+ *                 This is passed by the VFS layer whenever the function is called. 
+ *                 Persists in the fd managed by the kernel.
  * 
  * @return size of the read in bytes
  */
 ssize_t
 sysinfo_proc_read(struct file *file,
-                  char *read_buffer,
+                  char __user *user_buffer,
                   size_t available_bytes,
                   loff_t *offset)
 {
-    int ret;
-    char buffer[PROCFS_MAX_SIZE];
+    char* copy_target = "Something to print to read_buf\n";
+    char read_buf[PROCFS_MAX_SIZE];
 
-    // check if read is finished, if so return EOF
-    if (*offset > 0)
+    // if starting the read, get the current_info_type
+    // this prevents multiple get_current_info_type calls
+    if (*offset == 0)
     {
+        current_info_type = get_current_job()->job_title;
+        device_read_count = get_times_read();
+    }
+
+    printk("device_read_count: %d\n", device_read_count);
+
+    // when the offset value is greater then the length of the
+    // string to copy, EOF condition has been met.
+    if (*offset >= strlen(copy_target))
+    {
+        printk("EOF condition reached\n");
         return EOF;
     }
 
-    // use snprintf to ensure write doesn't overflow buffer
-    ret = snprintf(buffer, PROCFS_MAX_SIZE, "device name:%s\nread count: %d\ncurrent_info_type: %s\n", DEVICE_NAME, get_times_read(), get_current_job()->job_title);
-    if (ret < 0)
+    // write to read_buf
+    // store count of bytes written in 'n'
+    int n = snprintf(read_buf, PROCFS_MAX_SIZE, copy_target);
+    if (n <= 0)
     {
-        pr_err("Copy to /proc buffer exceeded buffer limit.\n");
+        pr_err("Could not write data to read_buf\n");
+        return -EFAULT;
+    }
+    int bytes_written = n;
+
+    // copy n bytes from read_buf, starting at offset position within read_buf
+    int ret = copy_to_user(user_buffer, &read_buf + *offset, n);
+    if (ret != 0)
+    {
+        pr_err("An error occurred copying internal buffer in read() to user space buffer\n");
         return -EFAULT;
     }
 
-    size_t len = strlen(buffer);
-    if (available_bytes < len)
-    {
-        len = available_bytes;
-    }
+    // update the offset to track read progress
+    *offset += bytes_written;
 
-    if (copy_to_user(read_buffer, read_buffer, len))
-    {
-        return -EFAULT;
-    }
-
-    *offset += len;
-
-    return len;
+    return bytes_written;
 };
 
+// structure to hold information about the proc file
+struct proc_dir_entry *proc_entry;
 
 static const struct proc_ops proc_ops = {
     .proc_read = sysinfo_proc_read,
@@ -90,12 +108,16 @@ static const struct proc_ops proc_ops = {
  * 
  * @return int status code
  */
-int __init char_device_proc_init(void)
+int
+__init
+char_device_proc_init(void)
 {
-    // Create the proc file at /proc/PROC_FILE_NAME
+    // Create the proc file at /proc/PROC_FILE_NAME.
+    // Pass NULL as pointer for parent proc directory, as this is a child file of /proc
     proc_entry = proc_create(PROC_FILE_NAME, 0666, NULL, &proc_ops);
     if (!proc_entry) {
         pr_err("Failed to create /proc/%s\n", PROC_FILE_NAME);
+        // entry will fail if system runs out of memory
         return -ENOMEM;
     }
 
@@ -106,14 +128,18 @@ int __init char_device_proc_init(void)
 /**
  * @brief function to remove /proc file
  */
-void __exit char_device_proc_exit(void)
+void
+__exit
+char_device_proc_exit(void)
 {
     // Remove the proc file
     proc_remove(proc_entry);
     pr_info("/proc/%s removed\n", PROC_FILE_NAME);
 };
 
-int append_to_proc(struct seq_file *m, void *v)
+int
+append_to_proc(struct seq_file *m,
+               void *v)
 {
     seq_printf(m, "initial content\n");
     seq_printf(m, "more data\n");

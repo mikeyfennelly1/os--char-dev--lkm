@@ -2,16 +2,41 @@
 
 This is an API that allows you to perform operations with the /proc filesystem for this module.
 
-== Create the /proc filesystem
+== procfs.c internals
 
-[NOTE]
-----
-This should only be used once in the application, that being on kernel module initialization.
-----
+=== read()
+
+This function is a callback for when the read() syscall is performed on /proc/sysinfo. When this syscall is called the kernel looks internally for the `struct file` for the file descriptor for /proc/sysinfo. Here is what `struct file` looks like:
 
 [source, c]
 ----
-create_procfs();
+struct file {
+    union {
+        struct llist_node   fu_llist;
+        struct rcu_head     fu_rcuhead;
+    } f_u;
+    struct path            f_path;       /* File path information */
+    struct inode           *f_inode;     /* Pointer to inode */
+    const struct file_operations *f_op;  /* File operations */
+    spinlock_t             f_lock;       /* Lock for the file */
+    atomic_long_t          f_count;      /* Reference count */
+    unsigned int           f_flags;      /* File access mode and flags */
+    mode_t                 f_mode;       /* File mode */
+    loff_t                 f_pos;        /* File offset */
+    struct fown_struct     f_owner;      /* File owner */
+    struct cred            *f_cred;      /* File credentials */
+    struct file_ra_state   f_ra;         /* Read-ahead state */
+    struct address_space   *f_mapping;   /* Memory mapping */
+    struct mutex           f_pos_lock;   /* Position lock */
+    struct dentry          *f_dentry;    /* Dentry pointer */
+};
 ----
 
-== Redirect output to the /proc filesystem
+The read function uses this kernel data structure to maintain and modifly with the state of the file across different reads. *Here is the prototype for the read function*:
+
+[source, c]
+----
+ssize_t sysinfo_proc_read(struct file *file, char __user *user_buffer, size_t available_bytes, loff_t *offset);
+----
+
+As you can see this method takes a pointer to a file, a pointer to the buffer in user space, the available bytes, and a pointer to the offset in the file.

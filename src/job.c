@@ -82,7 +82,8 @@ append_to_job_buffer(DynamicJobBuffer *b,
     b->size += text_len;
 }
 
-void free_job_buffer(DynamicJobBuffer *b)
+void
+free_job_buffer(DynamicJobBuffer *b)
 {
     kfree(b->data);
     b->data = NULL;
@@ -97,7 +98,8 @@ void free_job_buffer(DynamicJobBuffer *b)
  * @return Step* - pointer to the initialized step.
  * @return NULL if step init failed.
  */
-Step* step_init(key_value_pair (*get_kvp)(void))
+Step*
+step_init(key_value_pair (*get_kvp)(void))
 {
     Step* step;
     step = (Step*) kmalloc(sizeof(Step), GFP_KERNEL);
@@ -117,8 +119,9 @@ Step* step_init(key_value_pair (*get_kvp)(void))
  * @return a pointer to the initialized Job,
  *         NULL if job_init failed
  */
-Job* job_init(char* title,
-              key_value_pair (*head_func)(void))
+Job*
+job_init(char* title,
+         key_value_pair (*head_func)(void))
 {
     // kmalloc new Job.
     Job* job = (Job*)kmalloc(sizeof(Job), GFP_KERNEL);
@@ -147,21 +150,21 @@ Job* job_init(char* title,
  * @param job - the job to add the function pointer to.
  * @param get_kvp_func - the function for the step to add
  */
-void append_step_to_job(Job* job,
-                        key_value_pair (*get_kvp_func)(void))
+void
+append_step_to_job(Job* job,
+                   key_value_pair (*get_kvp_func)(void))
 {
     // initialize cur as job.head
     Step* cur = job->head;
 
     while (cur->next != NULL)       // until cur.next is a NULL pointer
     {
-        printk("Walking job list. Current KVP key: %s\n", cur->get_kvp().key);
         cur = cur->next;            // ... walk the job.
     }
     
     if (get_kvp_func == NULL)
     {
-        printk("get_kvp_func == NULL\n");
+        pr_err("get_kvp_func == NULL\n");
         return;
     }
 
@@ -169,17 +172,16 @@ void append_step_to_job(Job* job,
     Step* p_step_to_add = step_init(get_kvp_func);
     if (p_step_to_add == NULL)
     {
-        printk(KERN_ERR "Pointer to step to add is NULL\n");
+        pr_err("Pointer to step to add is NULL\n");
         return;
     }
     cur->next = p_step_to_add;
 
     if (cur->next == NULL)
     {
-        printk("End of the list reached.\n");
-        printk("kvp_of cur (expected to be last) is: %s:%s.\n", cur->get_kvp().key, cur->get_kvp().value);
+        pr_err("End of the list reached.\n");
+        pr_err("kvp_of cur (expected to be last) is: %s:%s.\n", cur->get_kvp().key, cur->get_kvp().value);
     }
-
 
     job->step_count++;
     return;
@@ -195,7 +197,8 @@ void append_step_to_job(Job* job,
  * WARNING: It is the responsibility of the caller to free
  * the memory of the returned buffer.
  */
-char* run_job(Job* j)
+char*
+run_job(Job* j)
 {
     if (j == NULL)
     {

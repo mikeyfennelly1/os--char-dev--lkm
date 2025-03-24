@@ -258,7 +258,9 @@ static struct file_operations fops = {
  * @return integer status code - 0 on success, non-zero value 
  *         relevant to error otherwise.
  */
-int __init sysinfo_cdev_init(void)
+int
+__init
+sysinfo_cdev_init(void)
 {
     // set the start time variable
     start_time = ktime_get();
@@ -330,7 +332,9 @@ int __init sysinfo_cdev_init(void)
  * Tears down device and device class and removed the prok file.
  * Prints to kernel logs before returning.
  */
-void __exit sysinfo_cdev_exit(void)
+void
+__exit
+sysinfo_cdev_exit(void)
 {
     // remove the device from the kernel
     int major;
