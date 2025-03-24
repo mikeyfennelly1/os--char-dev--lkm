@@ -33,13 +33,19 @@
 // device definitions
 #define DEVICE_NAME "sysinfo"
 
+#define DEV_BUF_MAX_SIZE 256
+
+#ifndef EOF
+#define EOF 0
+#endif
+
 // device constants
 static dev_t dev_num;                           // device number - major and minor
 static struct cdev sysinfo_cdev;                // character device struct
 static struct class *sysinfo_dev_class;         //
 static ktime_t start_time;                      // record start time in this var
 static int times_read = 0;                      // counter for the amount of times read() called on this device
-static DEFINE_MUTEX(times_read_mutex);          // mutex to ensure mutual exclusion on times_read increments
+static DEFINE_MUTEX(device_read_mutex);          // mutex to ensure mutual exclusion on times_read increments
 static bool device_open = false;                  // true if user space application has opened device and not closed yet, else false
 static DEFINE_MUTEX(device_mutex);              // mutex to ensure mutual exclusion over processes that can open device
 
@@ -113,57 +119,73 @@ ssize_t
 sysinfo_read(struct file *filp,
              char __user *user_buffer,
              size_t count,
-             loff_t *f_pos)
+             loff_t *offset)
 {
-    mutex_lock(&times_read_mutex);
-    times_read++; // increment the times_read counter
-    mutex_unlock(&times_read_mutex);
-
-    // declare the number of bytes to copy to userspace
-    // and a counter (bytes_copied).
     ssize_t bytes_to_copy, bytes_copied;
+    Job* current_job;
+    char* current_job_data;
+    ssize_t current_job_data_size;
 
-    // get the current job.
-    Job* current_job = get_current_job();
-    if (current_job == NULL)
+    mutex_lock(&device_read_mutex);
+    if (*offset == 0)
     {
-        pr_err("current_job pointer is NULL\n");
+        // increment the times_read counter
+        times_read++;
+        
+        // get the current job
+        current_job = get_current_job();
+        if (current_job == NULL)
+        {
+            pr_err("current_job pointer is NULL\n");
+            return -EFAULT;
+        }    
+
+        // use the current_job to retrieve sysinfo for current moment in time.
+        // store job data in character buffer.
+        current_job_data = run_job(current_job);
+        if (current_job_data == NULL)
+        {
+            pr_err("current_job_data pointer is null\n");
+            return -EFAULT;
+        }
+
+        current_job_data_size = strlen(current_job_data);
+        if (current_job_data_size <= 0)
+        {
+            pr_err("sysinfo device retrieved no data\n");
+            return -EAGAIN;
+        }
+    }
+    mutex_unlock(&device_read_mutex);
+
+    // if the offset value is out of bounds of current_job_data_size
+    // EOF condition has been reached.
+    if (*offset >= current_job_data_size)
+    {
+        pr_info("EOF condition reached\n");
+        return EOF;
+    }
+
+    char read_buf[DEV_BUF_MAX_SIZE];
+
+    int n = snprintf(read_buf, DEV_BUF_MAX_SIZE, current_job_data);
+    if (n <= 0)
+    {
+        pr_err("Could not write data to read_buf\n");
         return -EFAULT;
     }
-
-    // use the current_job to retrieve sysinfo for current moment in time.
-    // store job data in character buffer.
-    char* current_job_data = run_job(current_job);
-    if (current_job_data == NULL)
-    {
-        pr_err("current_job_data pointer is null\n");
-        return -EFAULT;
-    }
-
-    int message_len = strlen(current_job_data);
-    if (message_len <= 0)
-    {
-        pr_err("sysinfo device retrieved no data\n");
-        return -EAGAIN;
-    }
-
-    if (*f_pos >= message_len)
-    {
-        pr_err("File position pointer exceeds message length\n");
-        return -EAGAIN;
-    }
-
-    bytes_to_copy = min(count, (size_t)(message_len - *f_pos));
+    int bytes_written = n;
 
     // Copy the retrieved data to user space
-    bytes_copied = copy_to_user(user_buffer, current_job_data + *f_pos, bytes_to_copy);
-    if (bytes_copied)
+    bytes_copied = copy_to_user(user_buffer, &read_buf + *offset, n);
+    if (bytes_copied != 0)
+    {
+        pr_err("An error occurred copying internal buffer in /dev read() to user space buffer\n");
         return -EFAULT;
+    }
 
-    // increment the file position by bytes_to_copy
-    // (i.e. the number of bytes read) and thus where 
-    // this read stopped.
-    *f_pos += bytes_to_copy;
+    // increment the offset position by bytes_copied
+    *offset += bytes_written;
 
     return bytes_to_copy;
 }

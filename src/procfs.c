@@ -49,6 +49,7 @@ sysinfo_proc_read(struct file *file,
 {
     char* copy_target = "Something to print to read_buf\n";
     char read_buf[PROCFS_MAX_SIZE];
+    int copy_target_size_bytes;
 
     // if starting the read, get the current_info_type
     // this prevents multiple get_current_info_type calls
@@ -56,13 +57,14 @@ sysinfo_proc_read(struct file *file,
     {
         current_info_type = get_current_job()->job_title;
         device_read_count = get_times_read();
+        copy_target_size_bytes = strlen(copy_target);
     }
 
     printk("device_read_count: %d\n", device_read_count);
 
     // when the offset value is greater then the length of the
     // string to copy, EOF condition has been met.
-    if (*offset >= strlen(copy_target))
+    if (*offset >= copy_target_size_bytes)
     {
         printk("EOF condition reached\n");
         return EOF;
@@ -82,7 +84,7 @@ sysinfo_proc_read(struct file *file,
     int ret = copy_to_user(user_buffer, &read_buf + *offset, n);
     if (ret != 0)
     {
-        pr_err("An error occurred copying internal buffer in read() to user space buffer\n");
+        pr_err("An error occurred copying internal buffer in /proc read() to user space buffer\n");
         return -EFAULT;
     }
 
