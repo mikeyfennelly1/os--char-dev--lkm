@@ -44,18 +44,27 @@ sysinfo_proc_read(struct file *file,
                   size_t available_bytes,
                   loff_t *offset)
 {
+    char* copy_target = "Something to print to read_buf\n";
     char read_buf[PROCFS_MAX_SIZE];
+
+    // when the offset value is greater then the length of the
+    // string to copy, EOF condition has been met.
+    if (*offset >= strlen(copy_target))
+    {
+        printk("EOF condition reached\n");
+        return EOF;
+    }
 
     // write to read_buf
     // store count of bytes written in 'n'
-    int n = snprintf(read_buf, PROCFS_MAX_SIZE, "Something to print to read_buf");
+    int n = snprintf(read_buf, PROCFS_MAX_SIZE, copy_target);
     if (n <= 0)
     {
         pr_err("Could not write data to read_buf\n");
         return -EFAULT;
     }
     int bytes_written = n;
-    
+
     // copy n bytes from read_buf, starting at offset position within read_buf
     int ret = copy_to_user(user_buffer, &read_buf + *offset, n);
     if (ret != 0)
