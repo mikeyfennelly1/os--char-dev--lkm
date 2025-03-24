@@ -102,6 +102,11 @@ sysinfo_release(struct inode *inode,
                 struct file *filep)
 {
     printk(KERN_INFO "release\n");
+
+    mutex_lock(&device_mutex);
+    device_open = false;
+    mutex_unlock(&device_mutex);
+    
     return 0;
 }
 
