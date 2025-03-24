@@ -14,7 +14,7 @@
 #include <linux/fs.h>                           // filesystem utility functions
 #include <linux/cdev.h>                         // character device utility functions
 #include <linux/init.h>                         // initialization and exit macros
-#include <linux/file.h>                         // 
+#include <linux/file.h>                         // file interaction headers
 #include <linux/device.h>                       // utils for managing devices in kernel space
 #include <linux/version.h>                      // utils for checking kernel version at compile time
 #include <linux/time.h>                         // time functions

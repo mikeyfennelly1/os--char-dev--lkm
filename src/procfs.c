@@ -47,9 +47,8 @@ sysinfo_proc_read(struct file *file,
                   size_t available_bytes,
                   loff_t *offset)
 {
-    char* copy_target = "Something to print to read_buf\n";
     char read_buf[PROCFS_MAX_SIZE];
-    int copy_target_size_bytes;
+    int msg_len;
 
     // if starting the read, get the current_info_type
     // this prevents multiple get_current_info_type calls
@@ -57,31 +56,27 @@ sysinfo_proc_read(struct file *file,
     {
         current_info_type = get_current_job()->job_title;
         device_read_count = get_times_read();
-        copy_target_size_bytes = strlen(copy_target);
-    }
 
-    printk("device_read_count: %d\n", device_read_count);
+        // write to read_buf
+        // store count of bytes written in 'n'
+        msg_len = snprintf(read_buf, PROCFS_MAX_SIZE, "read_count: %d\ncurrent_info_type: %s\n", device_read_count, current_info_type);
+        if (msg_len <= 0)
+        {
+            pr_err("Could not write data to read_buf\n");
+            return -EFAULT;
+        }
+    }
 
     // when the offset value is greater then the length of the
     // string to copy, EOF condition has been met.
-    if (*offset >= copy_target_size_bytes)
+    if (*offset >= msg_len)
     {
         printk("EOF condition reached\n");
         return EOF;
     }
 
-    // write to read_buf
-    // store count of bytes written in 'n'
-    int n = snprintf(read_buf, PROCFS_MAX_SIZE, copy_target);
-    if (n <= 0)
-    {
-        pr_err("Could not write data to read_buf\n");
-        return -EFAULT;
-    }
-    int bytes_written = n;
-
     // copy n bytes from read_buf, starting at offset position within read_buf
-    int ret = copy_to_user(user_buffer, &read_buf + *offset, n);
+    int ret = copy_to_user(user_buffer, &read_buf + *offset, msg_len);
     if (ret != 0)
     {
         pr_err("An error occurred copying internal buffer in /proc read() to user space buffer\n");
@@ -89,9 +84,9 @@ sysinfo_proc_read(struct file *file,
     }
 
     // update the offset to track read progress
-    *offset += bytes_written;
+    *offset += msg_len;
 
-    return bytes_written;
+    return msg_len;
 };
 
 // structure to hold information about the proc file
