@@ -20,15 +20,16 @@
 #include <linux/time.h>                         // time functions
 #include <linux/errno.h>                        // error macros
 #include <linux/mutex.h>                        // mutual exclusion utilities
+#include <linux/ioctl.h>                        // ioctl function prototypes
 
 // sysinfo device specific headers
 #include "./procfs.h"                           // proc filesystem utilities
 #include "job.h"                                // types and macros for Job API
 
 // ioctl definitions
-#define SET_CIT_CPU 1                           // set the current_info_type to cpu
-#define SET_CIT_MEMORY 2                        // set the current_info_type to memory
-#define SET_CIT_DISK 3                          // set the current_info_type to memory
+#define SET_CIT_CPU _IOW('C',CPU, int)          // set the current_info_type to cpu
+#define SET_CIT_MEM _IOW('M', MEMORY, int)      // set the current_info_type to memory
+#define SET_CIT_DISK _IOW('D', DISK, int)       // // set the current_info_type to disk
 
 // device definitions
 #define DEVICE_NAME "sysinfo"
@@ -42,11 +43,11 @@
 // device constants
 static dev_t dev_num;                           // device number - major and minor
 static struct cdev sysinfo_cdev;                // character device struct
-static struct class *sysinfo_dev_class;         //
+static struct class *sysinfo_dev_class;         // pointer to the device class in kernel space for this device
 static ktime_t start_time;                      // record start time in this var
 static int times_read = 0;                      // counter for the amount of times read() called on this device
-static DEFINE_MUTEX(device_read_mutex);          // mutex to ensure mutual exclusion on times_read increments
-static bool device_open = false;                  // true if user space application has opened device and not closed yet, else false
+static DEFINE_MUTEX(device_read_mutex);         // mutex to ensure mutual exclusion on times_read increments
+static bool device_open = false;                // true if user space application has opened device and not closed yet, else false
 static DEFINE_MUTEX(device_mutex);              // mutex to ensure mutual exclusion over processes that can open device
 
 // function prototypes
@@ -114,8 +115,7 @@ sysinfo_release(struct inode *inode,
  * @brief function to handle /dev node read.
  * 
  * @param filp - pointer to the current device file.
- * @param user_buffer - pointer in buffer in userspace to write data to on read.
- * @param count - maxumum number of bytes the function is to write to userspace.
+ * @param user_buffer - pointer in buffer in user ction is to write to userspace.
  * @param f_pos - pointer to current position in the file.
  * 
  * @return the amount of bytes read by this device read.
@@ -143,7 +143,7 @@ sysinfo_read(struct file *filp,
         {
             pr_err("current_job pointer is NULL\n");
             return -EFAULT;
-        }    
+        }
 
         // use the current_job to retrieve sysinfo for current moment in time.
         // store job data in character buffer.
@@ -160,12 +160,6 @@ sysinfo_read(struct file *filp,
             pr_err("sysinfo device retrieved no data\n");
             return -EAGAIN;
         }
-
-        printk("\n\n DATA SET FOR READ:\n\n");
-        printk("times_read: %d\n", times_read);
-        printk("current_job: %s\n", current_job->job_title);
-        printk("current_job_data: %s\n", current_job_data);
-        printk("current_job_data_size: %ld\n", current_job_data_size);
     }
     mutex_unlock(&device_read_mutex);
 
@@ -187,11 +181,8 @@ sysinfo_read(struct file *filp,
     }
     int bytes_written = n;
 
-    printk("bytes_written: %d\n", bytes_written);
-
     // Copy the retrieved data to user space
     bytes_copied = copy_to_user(user_buffer, &read_buf + *offset, n);
-    printk("bytes_copied: %ld\n", bytes_copied);
     if (bytes_copied != 0)
     {
         pr_err("An error occurred copying internal buffer in /dev read() to user space buffer\n");
@@ -246,31 +237,18 @@ sysinfo_ioctl(struct file *file,
               unsigned int cmd,
               unsigned long arg)
 {
+    printk("ioctl called");
+
     switch (cmd)
     {
     case SET_CIT_CPU:
-        if (set_current_info_type(CPU) < 0)
-        {
-            pr_info(KERN_WARNING "Failed to set current_info_type to CPU\n");
-            return -EFAULT;
-        }
-        pr_info("current_info_type set to CPU");
+        printk("ioctl set current\n");
         break;
-    case SET_CIT_MEMORY:
-        if (set_current_info_type(MEMORY) < 0)
-        {
-            pr_info(KERN_WARNING "Failed to set current_info_type to MEMORY\n");
-            return -EFAULT;
-        }
-        pr_info(KERN_INFO "current_info_type set to MEMORY");
+    case SET_CIT_MEM:
+        printk("ioctl set to memory\n");
         break;
     case SET_CIT_DISK:
-        if (set_current_info_type(DISK) < 0)
-        {
-            pr_info(KERN_WARNING "Failed to set current_info_type to DISK\n");
-            return -EFAULT;
-        }
-        pr_info(KERN_INFO "current_info_type set to DISK");
+        printk("ioctl set to disk\n");
         break;
     default:
         return -EINVAL;
