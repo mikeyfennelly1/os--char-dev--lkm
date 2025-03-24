@@ -82,7 +82,8 @@ append_to_job_buffer(DynamicJobBuffer *b,
     b->size += text_len;
 }
 
-void free_job_buffer(DynamicJobBuffer *b)
+void
+free_job_buffer(DynamicJobBuffer *b)
 {
     kfree(b->data);
     b->data = NULL;
@@ -97,7 +98,8 @@ void free_job_buffer(DynamicJobBuffer *b)
  * @return Step* - pointer to the initialized step.
  * @return NULL if step init failed.
  */
-Step* step_init(key_value_pair (*get_kvp)(void))
+Step*
+step_init(key_value_pair (*get_kvp)(void))
 {
     Step* step;
     step = (Step*) kmalloc(sizeof(Step), GFP_KERNEL);
@@ -117,8 +119,9 @@ Step* step_init(key_value_pair (*get_kvp)(void))
  * @return a pointer to the initialized Job,
  *         NULL if job_init failed
  */
-Job* job_init(char* title,
-              key_value_pair (*head_func)(void))
+Job*
+job_init(char* title,
+         key_value_pair (*head_func)(void))
 {
     // kmalloc new Job.
     Job* job = (Job*)kmalloc(sizeof(Job), GFP_KERNEL);
@@ -147,8 +150,9 @@ Job* job_init(char* title,
  * @param job - the job to add the function pointer to.
  * @param get_kvp_func - the function for the step to add
  */
-void append_step_to_job(Job* job,
-                        key_value_pair (*get_kvp_func)(void))
+void
+append_step_to_job(Job* job,
+                   key_value_pair (*get_kvp_func)(void))
 {
     // initialize cur as job.head
     Step* cur = job->head;
@@ -193,7 +197,8 @@ void append_step_to_job(Job* job,
  * WARNING: It is the responsibility of the caller to free
  * the memory of the returned buffer.
  */
-char* run_job(Job* j)
+char*
+run_job(Job* j)
 {
     if (j == NULL)
     {
