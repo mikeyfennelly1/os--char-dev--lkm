@@ -121,7 +121,7 @@ sysinfo_read(struct file *filp,
              size_t count,
              loff_t *offset)
 {
-    ssize_t bytes_to_copy, bytes_copied;
+    ssize_t bytes_copied;
     Job* current_job;
     char* current_job_data;
     ssize_t current_job_data_size;
@@ -155,6 +155,12 @@ sysinfo_read(struct file *filp,
             pr_err("sysinfo device retrieved no data\n");
             return -EAGAIN;
         }
+
+        printk("\n\n DATA SET FOR READ:\n\n");
+        printk("times_read: %d\n", times_read);
+        printk("current_job: %s\n", current_job->job_title);
+        printk("current_job_data: %s\n", current_job_data);
+        printk("current_job_data_size: %ld\n", current_job_data_size);
     }
     mutex_unlock(&device_read_mutex);
 
@@ -162,7 +168,7 @@ sysinfo_read(struct file *filp,
     // EOF condition has been reached.
     if (*offset >= current_job_data_size)
     {
-        pr_info("EOF condition reached\n");
+        printk("EOF condition reached\n");
         return EOF;
     }
 
@@ -176,8 +182,11 @@ sysinfo_read(struct file *filp,
     }
     int bytes_written = n;
 
+    printk("bytes_written: %d\n", bytes_written);
+
     // Copy the retrieved data to user space
     bytes_copied = copy_to_user(user_buffer, &read_buf + *offset, n);
+    printk("bytes_copied: %ld\n", bytes_copied);
     if (bytes_copied != 0)
     {
         pr_err("An error occurred copying internal buffer in /dev read() to user space buffer\n");
@@ -187,7 +196,7 @@ sysinfo_read(struct file *filp,
     // increment the offset position by bytes_copied
     *offset += bytes_written;
 
-    return bytes_to_copy;
+    return bytes_written;
 }
 
 /**
