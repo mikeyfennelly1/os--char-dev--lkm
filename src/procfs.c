@@ -26,8 +26,6 @@ int my_proc_open(struct inode *inode, struct file *file);
 int __init char_device_proc_init(void);
 void __exit char_device_proc_exit(void);
 
-static loff_t offset = 0;
-
 /**
  * @brief called when userspace file reads /proc/sysinfo
  * 
@@ -46,35 +44,28 @@ sysinfo_proc_read(struct file *file,
                   size_t available_bytes,
                   loff_t *offset)
 {
-    printk("Read\n");
     char read_buf[PROCFS_MAX_SIZE];
 
-    int ret = snprintf(read_buf, PROCFS_MAX_SIZE, "Something to print to read_buf");
-    int bytes_written = ret;
-
-    // check if snprintf wrote any bytes to read_buf
-    //      if not, return an error.
-    if (ret <= 0)
+    // write to read_buf
+    // store count of bytes written in 'n'
+    int n = snprintf(read_buf, PROCFS_MAX_SIZE, "Something to print to read_buf");
+    if (n <= 0)
     {
-        printk("Could not write string to read_buf\n");
+        pr_err("Could not write data to read_buf\n");
         return -EFAULT;
     }
-
-    // check if the data has already been read, EOF case
-    if (*offset >= bytes_written)
-    {
-        return EOF;
-    }
-
-    printk("buffer contents: %s\n", read_buf);
+    int bytes_written = n;
     
-    ret = copy_to_user(user_buffer, &read_buf, ret);
-    printk("copy_to_user ret: %d\n", ret);
+    // copy n bytes from read_buf, starting at offset position within read_buf
+    int ret = copy_to_user(user_buffer, &read_buf + *offset, n);
     if (ret != 0)
     {
-        printk("An error occurred copying internal buffer data to kernel space\n");
+        pr_err("An error occurred copying internal buffer in read() to user space buffer\n");
         return -EFAULT;
     }
+
+    // update the offset to track read progress
+    *offset += bytes_written;
 
     return bytes_written;
 };
