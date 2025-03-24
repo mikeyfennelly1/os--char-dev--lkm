@@ -26,20 +26,23 @@ int my_proc_open(struct inode *inode, struct file *file);
 int __init char_device_proc_init(void);
 void __exit char_device_proc_exit(void);
 
-static loff_t original_offset = 0;
+static loff_t offset = 0;
+
 /**
  * @brief called when userspace file reads /proc/sysinfo
  * 
  * @param file - pointer to /proc file struct in kernel space
  * @param user_buffer - buffer which the function data will be copied
  * @param available_bytes - number of bytes the reader is allowed to read
- * @param offset - offset for start of read within the file
+ * @param offset - offset for start of read within the file.
+ *                 This is passed by the VFS layer whenever the function is called. 
+ *                 Persists in the fd managed by the kernel.
  * 
  * @return size of the read in bytes
  */
 ssize_t
 sysinfo_proc_read(struct file *file,
-                  char *user_buffer,
+                  char __user *user_buffer,
                   size_t available_bytes,
                   loff_t *offset)
 {
@@ -47,15 +50,33 @@ sysinfo_proc_read(struct file *file,
     char read_buf[PROCFS_MAX_SIZE];
 
     int ret = snprintf(read_buf, PROCFS_MAX_SIZE, "Something to print to read_buf");
+    int bytes_written = ret;
+
+    // check if snprintf wrote any bytes to read_buf
+    //      if not, return an error.
     if (ret <= 0)
     {
         printk("Could not write string to read_buf\n");
         return -EFAULT;
     }
 
+    // check if the data has already been read, EOF case
+    if (*offset >= bytes_written)
+    {
+        return EOF;
+    }
+
     printk("buffer contents: %s\n", read_buf);
     
-    return EOF;
+    ret = copy_to_user(user_buffer, &read_buf, ret);
+    printk("copy_to_user ret: %d\n", ret);
+    if (ret != 0)
+    {
+        printk("An error occurred copying internal buffer data to kernel space\n");
+        return -EFAULT;
+    }
+
+    return bytes_written;
 };
 
 // structure to hold information about the proc file
