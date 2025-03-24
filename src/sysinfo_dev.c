@@ -242,13 +242,13 @@ sysinfo_ioctl(struct file *file,
     switch (cmd)
     {
     case SET_CIT_CPU:
-        printk("ioctl set current\n");
+        set_current_info_type(CPU);
         break;
     case SET_CIT_MEM:
-        printk("ioctl set to memory\n");
+        set_current_info_type(MEMORY);
         break;
     case SET_CIT_DISK:
-        printk("ioctl set to disk\n");
+        set_current_info_type(DISK);
         break;
     default:
         return -EINVAL;
