@@ -10,3 +10,4 @@ make clean
 cd ..
 sudo rmmod sysinfo
 sudo insmod ./build/sysinfo.ko
+sudo chmod 0666 /dev/sysinfo

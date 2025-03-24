@@ -20,6 +20,9 @@
 #define EOF 0
 #define PROCFS_MAX_SIZE 256
 
+char* current_info_type;
+int device_read_count;
+
 ssize_t sysinfo_proc_read(struct file *file, char *user_buffer, size_t available_bytes,  loff_t *offset);
 int append_to_proc(struct seq_file *m, void *v);
 int my_proc_open(struct inode *inode, struct file *file);
@@ -46,6 +49,16 @@ sysinfo_proc_read(struct file *file,
 {
     char* copy_target = "Something to print to read_buf\n";
     char read_buf[PROCFS_MAX_SIZE];
+
+    // if starting the read, get the current_info_type
+    // this prevents multiple get_current_info_type calls
+    if (*offset == 0)
+    {
+        current_info_type = get_current_job()->job_title;
+        device_read_count = get_times_read();
+    }
+
+    printk("device_read_count: %d\n", device_read_count);
 
     // when the offset value is greater then the length of the
     // string to copy, EOF condition has been met.
