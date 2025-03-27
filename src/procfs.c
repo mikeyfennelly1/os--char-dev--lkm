@@ -23,7 +23,7 @@
 char* current_info_type;
 int device_read_count;
 
-ssize_t sysinfo_proc_read(struct file *file, char *user_buffer, size_t available_bytes,  loff_t *offset);
+ssize_t sysinfo_proc_read(struct file *file, char __user *user_buffer, size_t available_bytes, loff_t *offset);
 int append_to_proc(struct seq_file *m, void *v);
 int my_proc_open(struct inode *inode, struct file *file);
 int __init char_device_proc_init(void);
