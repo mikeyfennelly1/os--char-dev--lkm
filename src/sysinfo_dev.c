@@ -126,12 +126,13 @@ sysinfo_read(struct file *filp,
              size_t count,
              loff_t *offset)
 {
-    ssize_t bytes_copied;
-    Job* current_job;
-    char* current_job_data;
-    ssize_t current_job_data_size;
+    ssize_t bytes_copied;           // num bytes copied to user space this read
+    Job* current_job;               // pointer to Job of current_info_type
+    char* current_job_data;         // sysinfo string returned from running job
+    ssize_t current_job_data_size;  // number of bytes in string returned from running job
 
     mutex_lock(&device_read_mutex);
+    // if this is the first read...
     if (*offset == 0)
     {
         // increment the times_read counter
@@ -173,6 +174,8 @@ sysinfo_read(struct file *filp,
 
     char read_buf[DEV_BUF_MAX_SIZE];
 
+    // write contents of current_job_data into read_buf up to n bytes
+    // where n = DEV_BUF_MAX_SIZE
     int n = snprintf(read_buf, DEV_BUF_MAX_SIZE, current_job_data);
     if (n <= 0)
     {
@@ -237,8 +240,7 @@ sysinfo_ioctl(struct file *file,
               unsigned int cmd,
               unsigned long arg)
 {
-    printk("ioctl called");
-
+    // change the current_info_type to parameter from icoctl write
     switch (cmd)
     {
     case SET_CIT_CPU:
@@ -257,7 +259,7 @@ sysinfo_ioctl(struct file *file,
     return 0;
 };
 
-// file_operations structure links system calls to driver to define the syscalls it supports
+// file_operations for this module
 static struct file_operations fops = {
     .owner = THIS_MODULE,
     .open = sysinfo_open,
@@ -307,6 +309,7 @@ sysinfo_cdev_init(void)
         return err_ret;
     }
 
+    // create the device class for this device
     sysinfo_dev_class = class_create(DEVICE_NAME);
     if (IS_ERR(sysinfo_dev_class))
     {
@@ -358,6 +361,7 @@ sysinfo_cdev_exit(void)
     cdev_del(&sysinfo_cdev); // delete character device
     unregister_chrdev_region(MKDEV(major, 0), 1); // unregister the major and minor number of device from kernel
 
+    // unload the /proc file for this module
     char_device_proc_exit();
     
     printk(KERN_INFO "Module unloaded\n");

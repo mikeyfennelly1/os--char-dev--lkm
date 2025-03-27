@@ -15,10 +15,10 @@ all: $(BUILD)
 	make -C /lib/modules/$(shell uname -r)/build M=$(PROJ_ROOT)/src modules
 	
 	# move targets out to build directory
-	cd $(SRCS) && $(SCRIPTS)/moveTargetsToBuild.sh
+	cd $(SRCS) && $(SCRIPTS)/moveTargetsToBuild.sh > /dev/null
 
 	# remove any other generated files from source directory
-	make -C /lib/modules/$(shell uname -r)/build M=$(SRCS) clean
+	make -C /lib/modules/$(shell uname -r)/build M=$(SRCS) clean > /dev/null
 	
 # create ./test/bin directory if it doesn't exist
 $(TEST_BIN_DIR):
