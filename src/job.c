@@ -1,3 +1,13 @@
+/**
+ * job.c
+ * 
+ * Functions for interacting with sysinfo jobs at a high level.
+ * Contains internals of Job, such as backing array for the Job
+ * buffer.
+ * 
+ * @author Mikey Fennelly
+ */
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include "cpu.h"
@@ -13,6 +23,7 @@
 #define MEMORY 2
 #define DISK 3
 
+// set current_info_type to CPU initially
 static int current_info_type = CPU;
 
 typedef struct {
@@ -21,6 +32,7 @@ typedef struct {
     ssize_t capacity;   // allocated capacity of the buffer
 } DynamicJobBuffer;
 
+// function prototypes
 DynamicJobBuffer* init_job_buffer(void);
 void resize_job_buffer(DynamicJobBuffer *b, size_t new_capacity);
 void append_to_job_buffer(DynamicJobBuffer *b, const char* text);
@@ -28,7 +40,15 @@ void free_job_buffer(DynamicJobBuffer *b);
 Step* step_init(key_value_pair (*get_kvp)(void));
 
 /**
- * Initialize a DynamicJobBuffer.
+ * @brief Backing array for writing sysinfo data as string.
+ * 
+ * This data structure and it's functions increase in size as 
+ * it fills near capacity. It increases it's size by a factor
+ * of GROWTH_FACTOR, when the backing array fills.
+ * 
+ * This is more efficient as there are less frequent resizes.
+ * 
+ * @return pointer to a DynamicJobBuffer.
  */
 DynamicJobBuffer*
 init_job_buffer(void)
@@ -46,20 +66,38 @@ init_job_buffer(void)
     return b;
 }
 
+/**
+ * @brief resize a DynamicJobBuffer.
+ * 
+ * @param b - pointer to the DynamicJobBuffer to resize.
+ * @param new_capacity - the new size of the backing array for the
+ *                       DynamicJobBuffer.
+ */
 void
 resize_job_buffer(DynamicJobBuffer *b,
                   size_t new_capacity)
 {
+    // reallocate the data into a new heap area of size new_capacity
     char *new_data = krealloc(b->data, new_capacity, GFP_KERNEL);
     if (!new_data)
     {
         pr_err("Memory allocation failed resizing job buffer\n");
         return;
     }
+
+    // set the data for the new DynamicJobBuffer 
+    // equal to the data of the previous.
     b->data = new_data;
+    // set the capacity of the array to new_capacity 
     b->capacity = new_capacity;
 }
 
+/**
+ * @brief append text to DynamicJobBuffer
+ * 
+ * @param b - the DynamicJobBuffer to append to
+ * @param text - text to append to b
+ */
 void
 append_to_job_buffer(DynamicJobBuffer *b,
                      const char* text)
@@ -82,6 +120,11 @@ append_to_job_buffer(DynamicJobBuffer *b,
     b->size += text_len;
 }
 
+/**
+ * @brief Free the memory occupied by a DynamicJobBuffer
+ * 
+ * @param b - DynamicJobBuffer to free.
+ */
 void
 free_job_buffer(DynamicJobBuffer *b)
 {
@@ -92,10 +135,11 @@ free_job_buffer(DynamicJobBuffer *b)
 }
 
 /**
- * Initialize a step with Step.next==NULL
+ * @brief Initialize a step with Step.next==NULL
  *
  * @param get_kvp the get_kvp function to initialize the step.
  * @return Step* - pointer to the initialized step.
+ * 
  * @return NULL if step init failed.
  */
 Step*
@@ -111,8 +155,7 @@ step_init(key_value_pair (*get_kvp)(void))
 }
 
 /**
- * Initialize a job, by title and first function
- * to run in the job.
+ * @brief Initialize a job, by title and first function to run in the job.
  *
  * @param title The title of the Job to initialize.
  * @param head_func the function for the first step in the Job.
@@ -145,7 +188,7 @@ job_init(char* title,
 }
 
 /**
- * Add a step to the job.
+ * @brief Add a step to the job.
  * 
  * @param job - the job to add the function pointer to.
  * @param get_kvp_func - the function for the step to add
@@ -188,6 +231,8 @@ append_step_to_job(Job* job,
 }
 
 /**
+ * @brief run steps in a Job.
+ * 
  * Runs the job (gets the key-value information for each step)
  * and writes the contents to a buffer 'target_buf'.
  *
@@ -233,7 +278,7 @@ run_job(Job* j)
 }
 
 /**
- * Get a pointer to the job for the current_info_type.
+ * @brief Get a pointer to the job for the current_info_type.
  * 
  * @return pointer to the job for current_info_type.
  */
@@ -262,6 +307,8 @@ get_current_job(void)
 }
 
 /**
+ * @brief set the current_info_type of the Job
+ * 
  * Set the value of the current info type to 1 of
  * 3 values:
  * 

@@ -32,6 +32,9 @@ $(BUILD):
 clean:
 	@rm -rf ./build
 
+ownership:
+	chown 1000:1000 /dev/sysinfo
+
 # install project dependencies
 install:
 	sudo apt update

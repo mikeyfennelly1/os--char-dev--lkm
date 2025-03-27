@@ -9,23 +9,24 @@
 #include <linux/proc_fs.h>                  // functions for /proc file interaction
 #include <linux/module.h>                   // functions for kernel module development
 #include <linux/seq_file.h>                 // sequential file functions
-#include <linux/kernel.h>                   // kernel development headerss
+#include <linux/kernel.h>                   // kernel development headers
 #include <linux/fs.h>                       // file system interaction headers
 #include <linux/types.h>                    // types for file offsets, sizes etc
 
-#include "sysinfo_dev.h"
-#include "job.h"
+#include "sysinfo_dev.h"                    // sysinfo device funcitons
+#include "job.h"                            // job functions
 
 #define PROC_FILE_NAME "sysinfo"
 #define EOF 0
 #define PROCFS_MAX_SIZE 256
 
-char* current_info_type;
-int device_read_count;
+char* current_info_type;                    // global var to store current_info_type
+int device_read_count;                      // number of times the /dev node has been read
 
+// prototypes
 ssize_t sysinfo_proc_read(struct file *file, char __user *user_buffer, size_t available_bytes, loff_t *offset);
 int append_to_proc(struct seq_file *m, void *v);
-int my_proc_open(struct inode *inode, struct file *file);
+int sysinfo_proc_open(struct inode *inode, struct file *file);
 int __init char_device_proc_init(void);
 void __exit char_device_proc_exit(void);
 
@@ -89,12 +90,12 @@ sysinfo_proc_read(struct file *file,
     return msg_len;
 };
 
-// structure to hold information about the proc file
+// proc file entry in kernel for this file
 struct proc_dir_entry *proc_entry;
 
 static const struct proc_ops proc_ops = {
     .proc_read = sysinfo_proc_read,
-    .proc_open = my_proc_open,
+    .proc_open = sysinfo_proc_open,
 };
 
 /**
@@ -138,8 +139,6 @@ int
 append_to_proc(struct seq_file *m,
                void *v)
 {
-    seq_printf(m, "initial content\n");
-    seq_printf(m, "more data\n");
     return 0;
 };
 
@@ -152,7 +151,7 @@ append_to_proc(struct seq_file *m,
  * @return status code
  */
 int
-my_proc_open(struct inode *inode,
+sysinfo_proc_open(struct inode *inode,
              struct file *file)
 {
     return single_open(file, append_to_proc, NULL);
